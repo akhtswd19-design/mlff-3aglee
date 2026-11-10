@@ -6,15 +6,24 @@ const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// إعدادات التليجرام
-const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN'; // ضع توكن البوت هنا
+const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_ID = 1056007305;
 const EXTERNAL_STORE_URL = 'https://threeagle-1.onrender.com';
+
+// السماح بالـ CORS لكي يتمكن المتجر الآخر من إرسال التقييمات إلى هنا مباشرة
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// قواعد البيانات البسيطة (ملفات JSON)
 const DB_PATH = path.join(__dirname, 'data.json');
 
 function loadData() {
@@ -23,9 +32,7 @@ function loadData() {
             visits: {},
             last24h: [],
             reviews: [
-                { id: 1, name: "فهد العتيبي", text: "ملفات ممتازة وشاملة جداً للتقديمات، أنصح بها وبشدة!", rating: 5 },
-                { id: 2, name: "محمد الشمري", text: "أفضل مصادر لمذاكرة اختبار الكفايات والمقابلات الشخصية.", rating: 5 },
-                { id: 3, name: "عبدالرحمن المطيري", text: "تحديثات مستمرة وتجاوب سريع، العاقل مضمون والحمد لله.", rating: 5 }
+                { id: 1, name: "عميل مميز", text: "تاريخي ماشاء الله عليك", rating: 5, date: "2026-10-26" }
             ]
         };
         fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2));
@@ -38,24 +45,30 @@ function saveData(data) {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 }
 
-// مزامنة التقييمات من المتجر الخارجي تلقائياً
-async function syncReviewsFromStore() {
-    try {
-        const response = await fetch(`${EXTERNAL_STORE_URL}/api/reviews`);
-        if (response.ok) {
-            const externalReviews = await response.json();
-            const data = loadData();
-            if (Array.isArray(externalReviews) && externalReviews.length > 0) {
-                data.reviews = externalReviews;
-                saveData(data);
-                console.log('تم تحديث التقييمات من المتجر الخارجي بنجاح');
-            }
-        }
-    } catch (err) {
-        console.log('جاري استخدام التقييمات المحلية (تعذر الاتصال بالمتجر الخارجي):', err.message);
-    }
-}
-syncReviewsFromStore();
+// استقبال التقييمات الجديدة (سواء من متجرك الأساسي أو أي مكان)
+app.post('/api/reviews', (req, res) => {
+    const { name, text, rating, date } = req.body;
+    const data = loadData();
+    
+    const newReview = {
+        id: Date.now(),
+        name: name || "عميل عسكري",
+        text: text || "تقييم ممتاز",
+        rating: parseInt(rating) || 5,
+        date: date || new Date().toISOString().split('T')[0]
+    };
+
+    data.reviews.unshift(newReview); // إضافة التقييم في البداية
+    saveData(data);
+
+    res.json({ success: true, review: newReview });
+});
+
+// إرجاع التقييمات للموقع الجديد
+app.get('/api/reviews', (req, res) => {
+    const data = loadData();
+    res.json(data.reviews || []);
+});
 
 // تسجيل الزيارات
 app.post('/api/visit', (req, res) => {
@@ -71,13 +84,7 @@ app.post('/api/visit', (req, res) => {
     res.json({ success: true });
 });
 
-// إرجاع التقييمات للموقع
-app.get('/api/reviews', (req, res) => {
-    const data = loadData();
-    res.json(data.reviews || []);
-});
-
-// معالجة أوامر التليجرام /admin
+// إرسال رسائل تليجرام
 async function sendTelegramMessage(chatId, text, replyMarkup = null) {
     if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
     try {
@@ -96,13 +103,13 @@ async function sendTelegramMessage(chatId, text, replyMarkup = null) {
     }
 }
 
+// بوت التليجرام (لوحة التحكم /admin)
 app.post(`/telegram-webhook`, async (req, res) => {
     const update = req.body;
     res.sendStatus(200);
 
     if (!update) return;
 
-    // التعامل مع الرسائل النصية
     if (update.message) {
         const msg = update.message;
         const chatId = msg.chat.id;
@@ -125,7 +132,6 @@ app.post(`/telegram-webhook`, async (req, res) => {
         }
     }
 
-    // التعامل مع ضغط الأزرار (Callback Queries)
     if (update.callback_query) {
         const query = update.callback_query;
         const chatId = query.message.chat.id;
@@ -160,7 +166,7 @@ app.post(`/telegram-webhook`, async (req, res) => {
                 return sendTelegramMessage(chatId, "لا توجد تقييمات حالياً.");
             }
             let buttons = dbData.reviews.map(r => [{
-                text: `❌ حذف: (${r.name} - ${r.rating}⭐)`,
+                text: `❌ حذف: (${r.text.substring(0, 15)}... - ${r.rating}⭐)`,
                 callback_data: `del_rev_${r.id}`
             }]);
             return sendTelegramMessage(chatId, "<b>🗑️ اضغط على التقييم الذي تريد حذفه:</b>", { inline_keyboard: buttons });
@@ -170,7 +176,7 @@ app.post(`/telegram-webhook`, async (req, res) => {
             const revId = parseInt(dataCmd.replace('del_rev_', ''));
             dbData.reviews = dbData.reviews.filter(r => r.id !== revId);
             saveData(dbData);
-            return sendTelegramMessage(chatId, `✅ تم حذف التقييم رقم #${revId} بنجاح.`);
+            return sendTelegramMessage(chatId, `✅ تم حذف التقييم بنجاح.`);
         }
     }
 });
