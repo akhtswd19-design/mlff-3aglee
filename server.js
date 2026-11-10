@@ -1,15 +1,15 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const fetch = require('node-fetch');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ضع توكن بوتك هنا أو اتركه ليقرأه من المتغيرات البيئية
 const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_ID = 1056007305;
 
-// لتخزين حالة الآدمن المؤقتة أثناء إضافة التقييم خطوة بخطوة
 const adminStates = {};
 
 app.use(express.json());
@@ -36,13 +36,11 @@ function saveData(data) {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 }
 
-// إرجاع التقييمات للموقع
 app.get('/api/reviews', (req, res) => {
     const data = loadData();
     res.json(data.reviews || []);
 });
 
-// تسجيل الزيارات
 app.post('/api/visit', (req, res) => {
     const data = loadData();
     const today = new Date().toISOString().split('T')[0];
@@ -56,33 +54,47 @@ app.post('/api/visit', (req, res) => {
     res.json({ success: true });
 });
 
-// إرسال رسائل تليجرام
-async function sendTelegramMessage(chatId, text, replyMarkup = null) {
+// دالة إرسال رسائل تليجرام باستخدام https المدمجة
+function sendTelegramMessage(chatId, text, replyMarkup = null) {
     if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
-    try {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text: text,
-                parse_mode: 'HTML',
-                reply_markup: replyMarkup
-            })
-        });
-    } catch (e) {
-        console.error('Telegram API Error:', e);
-    }
+    
+    const data = JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+    });
+
+    const options = {
+        hostname: 'api.telegram.org',
+        port: 443,
+        path: `/bot${BOT_TOKEN}/sendMessage`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+        }
+    };
+
+    const req = https.request(options, (res) => {
+        let responseBody = '';
+        res.on('data', (chunk) => { responseBody += chunk; });
+    });
+
+    req.on('error', (e) => {
+        console.error('Telegram send error:', e);
+    });
+
+    req.write(data);
+    req.end();
 }
 
-// بوت التليجرام (لوحة التحكم التفاعلية)
 app.post(`/telegram-webhook`, async (req, res) => {
     const update = req.body;
     res.sendStatus(200);
 
     if (!update) return;
 
-    // التعامل مع الرسائل النصية والخطوات التفاعلية
     if (update.message) {
         const msg = update.message;
         const chatId = msg.chat.id;
@@ -94,7 +106,7 @@ app.post(`/telegram-webhook`, async (req, res) => {
         }
 
         if (text === '/admin' || text === '/start') {
-            delete adminStates[chatId]; // إعادة ضبط أي حالة سابقة
+            delete adminStates[chatId];
             const keyboard = {
                 inline_keyboard: [
                     [{ text: "📊 إحصائيات الزيارات", callback_data: "stats" }],
@@ -106,7 +118,6 @@ app.post(`/telegram-webhook`, async (req, res) => {
             return sendTelegramMessage(chatId, "<b>مرحباً بك في لوحة أدمن منصة العاقل 👑</b>\nاختر من القائمة أدناه:", keyboard);
         }
 
-        // معالجة الخطوات التفاعلية لإضافة التقييم
         if (adminStates[chatId]) {
             const state = adminStates[chatId];
             
@@ -137,7 +148,6 @@ app.post(`/telegram-webhook`, async (req, res) => {
         }
     }
 
-    // التعامل مع الأزرار التفاعلية
     if (update.callback_query) {
         const query = update.callback_query;
         const chatId = query.message.chat.id;
@@ -187,7 +197,7 @@ app.post(`/telegram-webhook`, async (req, res) => {
                 
                 dbData.reviews.unshift(newReview);
                 saveData(dbData);
-                delete adminStates[chatId]; // مسح الحالة بعد الانتهاء
+                delete adminStates[chatId];
 
                 return sendTelegramMessage(chatId, `✅ <b>تم إضافة وحفظ التقييم بنجاح!</b>\n\n👤 <b>الاسم:</b> ${newReview.name}\n💬 <b>الوصف:</b> ${newReview.text}\n⭐ <b>التقييم:</b> ${'★'.repeat(rating)}\n\n<i>سيظهر في الموقع مباشرة الآن.</i>`);
             }
