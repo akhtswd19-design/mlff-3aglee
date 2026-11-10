@@ -1,482 +1,987 @@
 <!DOCTYPE html>
+
 <html lang="ar" dir="rtl">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>منصة العاقل العسكرية</title>
+
     <!-- خط تجوال العربي الفاخر -->
+
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+
     <!-- FontAwesome للايقونات -->
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     
+
     <style>
+
         :root {
+
             --bg-color: #050507;
+
             --card-bg: rgba(20, 20, 28, 0.75);
+
             --gold-primary: #D4AF37;
+
             --gold-glow: rgba(212, 175, 55, 0.4);
+
             --gold-gradient: linear-gradient(135deg, #FFE259 0%, #FFA751 100%);
+
             --blue-card-bg: linear-gradient(135deg, rgba(15, 32, 67, 0.85) 0%, rgba(9, 18, 44, 0.95) 100%);
+
             --text-light: #F0F0F0;
+
         }
+
+
 
         * {
+
             box-sizing: border-box;
+
             margin: 0;
+
             padding: 0;
+
             font-family: 'Tajawal', sans-serif;
+
             -webkit-tap-highlight-color: transparent;
+
         }
+
+
 
         body {
+
             background-color: var(--bg-color);
+
             color: var(--text-light);
+
             overflow-x: hidden;
+
             min-height: 100vh;
+
             position: relative;
+
         }
+
+
 
         /* خلفية النجوم الذهبية السلو موشن */
+
         #stars-canvas {
+
             position: fixed;
+
             top: 0;
+
             left: 0;
+
             width: 100%;
+
             height: 100%;
+
             z-index: 0;
+
             pointer-events: none;
+
         }
+
+
 
         /* إضاءة خلفية هادئة */
+
         .ambient-light {
+
             position: fixed;
+
             width: 400px;
+
             height: 400px;
+
             background: radial-gradient(circle, var(--gold-glow) 0%, rgba(0,0,0,0) 70%);
+
             top: 20%;
+
             left: 50%;
+
             transform: translate(-50%, -50%);
+
             z-index: 0;
+
             filter: blur(60px);
+
             opacity: 0.5;
+
             animation: pulseGlow 8s infinite alternate ease-in-out;
+
         }
+
+
 
         @keyframes pulseGlow {
+
             0% { opacity: 0.3; transform: translate(-50%, -50%) scale(0.8); }
+
             100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.2); }
+
         }
+
+
 
         /* شاشة الترحيب (Welcome Screen) */
+
         #welcome-screen {
+
             position: fixed;
+
             top: 0;
+
             left: 0;
+
             width: 100%;
+
             height: 100%;
+
             background-color: #030304;
+
             display: flex;
+
             flex-direction: column;
+
             justify-content: center;
+
             align-items: center;
+
             z-index: 9999;
+
             text-align: center;
+
             padding: 20px;
+
             transition: opacity 0.8s ease, transform 0.8s ease;
+
         }
+
+
 
         .welcome-title {
+
             font-size: 4rem;
+
             font-weight: 900;
+
             background: var(--gold-gradient);
+
             -webkit-background-clip: text;
+
             -webkit-text-fill-color: transparent;
+
             text-shadow: 0 0 30px var(--gold-glow);
+
             margin-bottom: 15px;
+
             animation: fadeInDown 1s cubic-bezier(0.16, 1, 0.3, 1);
+
         }
+
+
 
         .welcome-sub {
+
             font-size: 1.3rem;
+
             color: #d1d1d1;
+
             line-height: 1.6;
+
             max-width: 500px;
+
             animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+
         }
+
+
 
         /* فلاش ترانزشن عند الانتقال */
+
         .flash-overlay {
+
             position: fixed;
+
             top: 0;
+
             left: 0;
+
             width: 100%;
+
             height: 100%;
+
             background: #ffffff;
+
             z-index: 10000;
+
             opacity: 0;
+
             pointer-events: none;
+
             transition: opacity 0.4s ease-out;
+
         }
+
+
 
         .flash-active {
+
             opacity: 0.85;
+
         }
+
+
 
         /* الحاوية الرئيسية للمحتوى */
+
         .main-wrapper {
+
             position: relative;
+
             z-index: 1;
+
             max-width: 750px;
+
             margin: 0 auto;
+
             padding: 30px 20px;
+
             opacity: 0;
+
             transform: translateY(20px);
+
             transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+
         }
+
+
 
         .main-wrapper.visible {
+
             opacity: 1;
+
             transform: translateY(0);
+
         }
+
+
 
         /* الهيدر */
+
         .header-title {
+
             text-align: center;
+
             font-size: 3rem;
+
             font-weight: 900;
+
             color: #fff;
+
             margin-bottom: 30px;
+
             letter-spacing: 1px;
+
             text-shadow: 0 4px 20px rgba(255,255,255,0.15);
+
         }
 
-        /* شبكة الروابط السريعة */
+
+
+        /* شبكة الروابط السريعة (تطابق تصميم الصورة) */
+
         .links-grid {
+
             display: grid;
+
             grid-template-columns: repeat(2, 1fr);
+
             gap: 15px;
+
             margin-bottom: 25px;
+
         }
+
+
 
         .link-btn {
+
             background: var(--gold-gradient);
+
             color: #000;
+
             font-weight: 800;
+
             font-size: 1.25rem;
+
             padding: 16px 10px;
+
             border-radius: 14px;
+
             text-decoration: none;
+
             text-align: center;
+
             box-shadow: 0 8px 25px rgba(212, 175, 55, 0.25);
+
             transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+
             display: flex;
+
             align-items: center;
+
             justify-content: center;
+
             gap: 8px;
+
             border: 1px solid rgba(255, 255, 255, 0.3);
+
         }
+
+
 
         .link-btn:hover {
+
             transform: translateY(-4px) scale(1.02);
+
             box-shadow: 0 12px 30px rgba(212, 175, 55, 0.45);
+
         }
+
+
 
         .link-btn-full {
+
             grid-column: span 2;
+
             max-width: 280px;
+
             margin: 0 auto;
+
             width: 100%;
+
         }
+
+
 
         /* بطاقة المنتج الشامل العسكري */
+
         .product-card {
+
             background: var(--card-bg);
+
             border: 1px solid rgba(255, 255, 255, 0.12);
+
             backdrop-filter: blur(15px);
+
             border-radius: 20px;
+
             padding: 25px;
+
             margin: 35px 0;
+
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+
             transition: transform 0.4s ease, border-color 0.4s ease;
+
         }
+
+
 
         .product-card:hover {
+
             border-color: rgba(212, 175, 55, 0.5);
+
             transform: translateY(-2px);
+
         }
+
+
 
         .product-content {
+
             display: flex;
+
             flex-direction: row-reverse;
+
             gap: 20px;
+
             align-items: center;
+
         }
+
+
 
         @media (max-width: 600px) {
+
             .product-content {
+
                 flex-direction: column;
+
             }
+
         }
+
+
 
         .product-info {
+
             flex: 1;
+
         }
+
+
 
         .product-title {
+
             font-size: 1.6rem;
+
             font-weight: 800;
+
             color: #fff;
+
             margin-bottom: 12px;
+
             border-right: 4px solid var(--gold-primary);
+
             padding-right: 10px;
+
         }
+
+
 
         .product-desc {
+
             font-size: 0.95rem;
+
             color: #ccc;
+
             line-height: 1.7;
+
             margin-bottom: 15px;
+
         }
+
+
 
         .product-price {
+
             font-size: 1.3rem;
+
             font-weight: 800;
+
             color: var(--gold-primary);
+
             margin-bottom: 15px;
+
         }
+
+
 
         .product-img-box {
+
             width: 180px;
+
             height: 180px;
+
             border-radius: 14px;
+
             overflow: hidden;
+
             border: 2px solid rgba(212, 175, 55, 0.3);
+
             flex-shrink: 0;
+
         }
+
+
 
         .product-img-box img {
+
             width: 100%;
+
             height: 100%;
+
             object-fit: cover;
+
         }
+
+
 
         .buy-btn {
+
             display: block;
+
             width: 100%;
+
             background: var(--gold-gradient);
+
             color: #000;
+
             font-size: 1.2rem;
+
             font-weight: 800;
+
             text-align: center;
+
             padding: 14px;
+
             border-radius: 12px;
+
             text-decoration: none;
+
             margin-top: 15px;
+
             transition: all 0.3s ease;
+
         }
+
+
 
         .buy-btn:hover {
+
             filter: brightness(1.1);
+
             box-shadow: 0 5px 20px rgba(212, 175, 55, 0.4);
+
         }
 
-        /* قسم التقييمات الأزرق المميز */
+
+
+        /* قسم التقييمات الأزرق المميز (تطابق الصورة) */
+
         .reviews-section {
+
             display: flex;
+
             flex-direction: column;
+
             gap: 15px;
+
             margin-top: 30px;
+
         }
+
+
 
         .review-card {
+
             background: var(--blue-card-bg);
+
             border: 1px solid rgba(0, 150, 255, 0.25);
+
             border-radius: 16px;
+
             padding: 18px 22px;
+
             position: relative;
+
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+
             transition: all 0.4s ease;
+
         }
+
+
 
         .review-card:hover {
+
             transform: translateX(-5px);
+
             border-color: rgba(0, 180, 255, 0.5);
+
         }
+
+
 
         .review-header {
+
             display: flex;
+
             justify-content: space-between;
+
             align-items: center;
+
             margin-bottom: 8px;
+
         }
+
+
 
         .reviewer-name {
+
             font-size: 1.2rem;
+
             font-weight: 700;
+
             color: #fff;
+
         }
+
+
 
         .stars {
+
             color: #FFD700;
+
             font-size: 1rem;
+
             letter-spacing: 2px;
+
         }
+
+
 
         .review-text {
+
             color: #dbe4ff;
+
             font-size: 0.95rem;
+
             line-height: 1.6;
+
         }
+
+
 
         @keyframes fadeInDown {
+
             from { opacity: 0; transform: translateY(-30px); }
+
             to { opacity: 1; transform: translateY(0); }
+
         }
+
+
 
         @keyframes fadeInUp {
+
             from { opacity: 0; transform: translateY(30px); }
+
             to { opacity: 1; transform: translateY(0); }
+
         }
+
     </style>
+
 </head>
+
 <body>
 
+
+
     <canvas id="stars-canvas"></canvas>
+
     <div class="ambient-light"></div>
+
     <div class="flash-overlay" id="flash"></div>
 
+
+
     <!-- شاشة الترحيب المدعومة بالرسومات والضوء -->
+
     <div id="welcome-screen">
+
         <h1 class="welcome-title">العاقل</h1>
+
         <p class="welcome-sub">خطوتك الاولى للقطاعات العسكرية<br>ابدأها مع العاقل واضمن الجاهزية</p>
+
     </div>
+
+
 
     <!-- الواجهة الرئيسية -->
+
     <div class="main-wrapper" id="main-content">
+
         <h1 class="header-title">العاقل</h1>
 
+
+
         <!-- شبكة الروابط -->
+
         <div class="links-grid">
+
             <a href="https://t.me/Q3skrr" target="_blank" class="link-btn">
+
                 <span>قروب المناقشات العسكرية</span>
+
             </a>
+
             <a href="https://t.me/Al_3agle" target="_blank" class="link-btn">
+
                 <span>قناة اخبار العاقل</span>
+
             </a>
+
             <a href="https://t.me/Al3agl_bot" target="_blank" class="link-btn">
+
                 <span>بنك الاسئلة المجاني</span>
+
             </a>
+
             <a href="https://t.me/Al3agl_bot" target="_blank" class="link-btn">
+
                 <span>موقع التجارب المجاني</span>
+
             </a>
+
             <a href="https://t.me/Al3agl_bot" target="_blank" class="link-btn link-btn-full">
+
                 <span>متجر العاقل</span>
+
             </a>
+
         </div>
+
+
 
         <!-- بطاقة المنتج الشامل -->
+
         <div class="product-card">
+
             <div class="product-content">
+
                 <div class="product-img-box">
+
                     <img src="product.png" alt="الملفات الشامله العسكرية">
+
                 </div>
+
                 <div class="product-info">
+
                     <h2 class="product-title">الملفات الشامله العسكرية</h2>
+
                     <p class="product-desc">
+
                         جميع الملفات المتوفره، للتقديم على الوظائف العسكرية مع تحديثات الملفات والمعلومات وايضًا ملفات مذاكرة الاختبارات الكفايات / النفسيه / وغيرها…. شامل جميع المعلومات
+
                     </p>
+
                     <div class="product-price">8.99 ريال</div>
+
                 </div>
+
             </div>
+
             <a href="https://t.me/Al3agl_bot" target="_blank" class="buy-btn">اضغط للانتقال</a>
+
         </div>
+
+
 
         <!-- قسم تقييمات العملاء -->
+
         <div class="reviews-section" id="reviews-container">
+
             <!-- سيتم تحميل التقييمات تلقائياً هنا عبر JS -->
+
         </div>
+
     </div>
 
+
+
     <script>
+
         // 1. سلو موشن خلفية النجوم الذهبية
+
         const canvas = document.getElementById('stars-canvas');
+
         const ctx = canvas.getContext('2d');
+
         let stars = [];
 
+
+
         function resizeCanvas() {
+
             canvas.width = window.innerWidth;
+
             canvas.height = window.innerHeight;
+
         }
+
         window.addEventListener('resize', resizeCanvas);
+
         resizeCanvas();
 
+
+
         for (let i = 0; i < 90; i++) {
+
             stars.push({
+
                 x: Math.random() * canvas.width,
+
                 y: Math.random() * canvas.height,
+
                 size: Math.random() * 2 + 0.5,
-                speedY: (Math.random() * 0.15) + 0.05,
+
+                speedY: (Math.random() * 0.15) + 0.05, // حركة سلو موشن بطيئة ناعمة
+
                 opacity: Math.random() * 0.8 + 0.2
+
             });
+
         }
+
+
 
         function animateStars() {
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
             stars.forEach(star => {
+
                 ctx.fillStyle = `rgba(212, 175, 55, ${star.opacity})`;
+
                 ctx.beginPath();
+
                 ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+
                 ctx.fill();
 
+
+
                 star.y -= star.speedY;
+
                 if (star.y < 0) {
+
                     star.y = canvas.height;
+
                     star.x = Math.random() * canvas.width;
+
                 }
+
             });
+
             requestAnimationFrame(animateStars);
+
         }
+
         animateStars();
 
-        // 2. التحكم بشاشة الترحيب والترانزشن الفلاش السلس وتوثيق الزيارة والجلب
-        window.addEventListener('DOMContentLoaded', () => {
-            // تسجيل الزيارة فور فتح الموقع للسيرفر والإحصائيات
-            fetch('/api/visit', { method: 'POST' }).catch(err => console.log(err));
 
-            // تحميل التقييمات ديناميكياً
+
+        // 2. التحكم بشاشة الترحيب والترانزشن الفلاش السلس
+
+        window.addEventListener('DOMContentLoaded', () => {
+
+            // تسجيل الزيارة للآدمن
+
+            fetch('/api/visit', { method: 'POST' });
+
+
+
+            // تحميل التقييمات
+
             loadReviews();
 
+
+
             setTimeout(() => {
+
                 const flash = document.getElementById('flash');
+
                 const welcome = document.getElementById('welcome-screen');
+
                 const main = document.getElementById('main-content');
 
+
+
+                // فلاش ترانزشن
+
                 flash.classList.add('flash-active');
+
                 
+
                 setTimeout(() => {
+
                     welcome.style.display = 'none';
+
                     main.classList.add('visible');
+
                     flash.classList.remove('flash-active');
+
                 }, 400);
 
-            }, 2000);
+
+
+            }, 2000); // إظهار الترحيب لمدة ثانيتين بالضبط
+
         });
 
-        // 3. دالة جلب وعرض التقييمات
+
+
+        // 3. جلب التقييمات ديناميكياً
+
         async function loadReviews() {
+
             try {
+
                 const res = await fetch('/api/reviews');
+
                 const reviews = await res.json();
+
                 const container = document.getElementById('reviews-container');
+
                 
-                if (!reviews || reviews.length === 0) {
-                    container.innerHTML = '<p style="text-align:center; color:#888;">لا توجد تقييمات حالياً</p>';
-                    return;
-                }
+
+                if (reviews.length === 0) return;
+
+
 
                 container.innerHTML = reviews.map(r => `
+
                     <div class="review-card">
+
                         <div class="review-header">
+
                             <span class="reviewer-name">${escapeHtml(r.name)}</span>
+
                             <span class="stars">${'★'.repeat(r.rating || 5)}</span>
+
                         </div>
+
+                        <p class="review-text">${escapeHtml(r.text)}</p>
+
+                    </div>
+
+                `).join('');
+
+            } catch (e) {
+
+                console.error("خطأ في تحميل التقييمات:", e);
+
+            }
+
+        }
+
+
+
+        function escapeHtml(text) {
+
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        }
+
+    </script>
+
+</body>
+
+</html>
