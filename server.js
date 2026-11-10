@@ -6,7 +6,8 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
+// قراءة التكن من البيئة حصرياً
+const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = 1056007305;
 
 const adminStates = {};
@@ -28,7 +29,11 @@ function loadData() {
         fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2));
         return initial;
     }
-    return JSON.parse(fs.readFileSync(DB_PATH));
+    try {
+        return JSON.parse(fs.readFileSync(DB_PATH));
+    } catch (e) {
+        return { visits: {}, last24h: [], reviews: [] };
+    }
 }
 
 function saveData(data) {
@@ -53,9 +58,8 @@ app.post('/api/visit', (req, res) => {
     res.json({ success: true });
 });
 
-// دالة إيقاف دائرة تحميل الأزرار في تليجرام
 function answerCallback(callbackQueryId) {
-    if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
+    if (!BOT_TOKEN) return;
     const data = JSON.stringify({ callback_query_id: callbackQueryId });
     const options = {
         hostname: 'api.telegram.org',
@@ -70,16 +74,20 @@ function answerCallback(callbackQueryId) {
     req.end();
 }
 
-// دالة إرسال رسائل تليجرام
 function sendTelegramMessage(chatId, text, replyMarkup = null) {
-    if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
+    if (!BOT_TOKEN) {
+        console.error('ERROR: BOT_TOKEN is missing in environment variables!');
+        return;
+    }
     
-    const data = JSON.stringify({
+    const payload = {
         chat_id: chatId,
         text: text,
         parse_mode: 'HTML',
         reply_markup: replyMarkup
-    });
+    };
+
+    const data = JSON.stringify(payload);
 
     const options = {
         hostname: 'api.telegram.org',
@@ -92,8 +100,20 @@ function sendTelegramMessage(chatId, text, replyMarkup = null) {
         }
     };
 
-    const req = https.request(options, (res) => {});
-    req.on('error', (e) => {});
+    const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+            if (res.statusCode !== 200) {
+                console.error('Telegram API Error Response:', body);
+            }
+        });
+    });
+
+    req.on('error', (e) => {
+        console.error('Telegram send error:', e);
+    });
+
     req.write(data);
     req.end();
 }
@@ -166,16 +186,14 @@ app.post(`/telegram-webhook`, async (req, res) => {
 
         if (fromId !== ADMIN_ID) return;
 
-        // إيقاف دائرة التحميل للزر فوراً
         answerCallback(queryId);
-
         const dbData = loadData();
 
         if (dataCmd === 'stats') {
             let statsText = "<b>📊 إحصائيات الزيارات حسب الأيام:</b>\n\n";
             const keys = Object.keys(dbData.visits || {}).sort().reverse();
             if (keys.length === 0) {
-                statsText += "لا توجد زيارات مسجلة حتى الآن.";
+                statsText += "لا توجد زيارات مسجلة حتى الآن (0 زيارة).";
             } else {
                 keys.slice(0, 10).forEach(date => {
                     statsText += `🗓️ <b>${date}:</b> ${dbData.visits[date]} زيارة\n`;
