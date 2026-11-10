@@ -150,7 +150,7 @@
             text-shadow: 0 4px 20px rgba(255,255,255,0.15);
         }
 
-        /* شبكة الروابط السريعة (تطابق تصميم الصورة) */
+        /* شبكة الروابط السريعة */
         .links-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -280,7 +280,7 @@
             box-shadow: 0 5px 20px rgba(212, 175, 55, 0.4);
         }
 
-        /* قسم التقييمات الأزرق المميز (تطابق الصورة) */
+        /* قسم التقييمات الأزرق المميز */
         .reviews-section {
             display: flex;
             flex-direction: column;
@@ -415,7 +415,7 @@
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
                 size: Math.random() * 2 + 0.5,
-                speedY: (Math.random() * 0.15) + 0.05, // حركة سلو موشن بطيئة ناعمة
+                speedY: (Math.random() * 0.15) + 0.05,
                 opacity: Math.random() * 0.8 + 0.2
             });
         }
@@ -438,12 +438,12 @@
         }
         animateStars();
 
-        // 2. التحكم بشاشة الترحيب والترانزشن الفلاش السلس
+        // 2. التحكم بشاشة الترحيب والترانزشن الفلاش السلس وتوثيق الزيارة والجلب
         window.addEventListener('DOMContentLoaded', () => {
-            // تسجيل الزيارة للآدمن
-            fetch('/api/visit', { method: 'POST' });
+            // تسجيل الزيارة فور فتح الموقع للسيرفر والإحصائيات
+            fetch('/api/visit', { method: 'POST' }).catch(err => console.log(err));
 
-            // تحميل التقييمات
+            // تحميل التقييمات ديناميكياً
             loadReviews();
 
             setTimeout(() => {
@@ -451,7 +451,6 @@
                 const welcome = document.getElementById('welcome-screen');
                 const main = document.getElementById('main-content');
 
-                // فلاش ترانزشن
                 flash.classList.add('flash-active');
                 
                 setTimeout(() => {
@@ -460,17 +459,20 @@
                     flash.classList.remove('flash-active');
                 }, 400);
 
-            }, 2000); // إظهار الترحيب لمدة ثانيتين بالضبط
+            }, 2000);
         });
 
-        // 3. جلب التقييمات ديناميكياً
+        // 3. دالة جلب وعرض التقييمات
         async function loadReviews() {
             try {
                 const res = await fetch('/api/reviews');
                 const reviews = await res.json();
                 const container = document.getElementById('reviews-container');
                 
-                if (reviews.length === 0) return;
+                if (!reviews || reviews.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:#888;">لا توجد تقييمات حالياً</p>';
+                    return;
+                }
 
                 container.innerHTML = reviews.map(r => `
                     <div class="review-card">
@@ -478,17 +480,3 @@
                             <span class="reviewer-name">${escapeHtml(r.name)}</span>
                             <span class="stars">${'★'.repeat(r.rating || 5)}</span>
                         </div>
-                        <p class="review-text">${escapeHtml(r.text)}</p>
-                    </div>
-                `).join('');
-            } catch (e) {
-                console.error("خطأ في تحميل التقييمات:", e);
-            }
-        }
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-    </script>
-</body>
-</html>
