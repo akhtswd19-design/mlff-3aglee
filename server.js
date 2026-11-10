@@ -8,18 +8,9 @@ const PORT = process.env.PORT || 3000;
 
 const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_ID = 1056007305;
-const EXTERNAL_STORE_URL = 'https://threeagle-1.onrender.com';
 
-// السماح بالـ CORS لكي يتمكن المتجر الآخر من إرسال التقييمات إلى هنا مباشرة
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
+// لتخزين حالة الآدمن المؤقتة أثناء إضافة التقييم خطوة بخطوة
+const adminStates = {};
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -32,7 +23,7 @@ function loadData() {
             visits: {},
             last24h: [],
             reviews: [
-                { id: 1, name: "عميل مميز", text: "تاريخي ماشاء الله عليك", rating: 5, date: "2026-10-26" }
+                { id: 1, name: "فهد العتيبي", text: "تاريخي ماشاء الله عليك", rating: 5, date: "2026-10-26" }
             ]
         };
         fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2));
@@ -45,26 +36,7 @@ function saveData(data) {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 }
 
-// استقبال التقييمات الجديدة (سواء من متجرك الأساسي أو أي مكان)
-app.post('/api/reviews', (req, res) => {
-    const { name, text, rating, date } = req.body;
-    const data = loadData();
-    
-    const newReview = {
-        id: Date.now(),
-        name: name || "عميل عسكري",
-        text: text || "تقييم ممتاز",
-        rating: parseInt(rating) || 5,
-        date: date || new Date().toISOString().split('T')[0]
-    };
-
-    data.reviews.unshift(newReview); // إضافة التقييم في البداية
-    saveData(data);
-
-    res.json({ success: true, review: newReview });
-});
-
-// إرجاع التقييمات للموقع الجديد
+// إرجاع التقييمات للموقع
 app.get('/api/reviews', (req, res) => {
     const data = loadData();
     res.json(data.reviews || []);
@@ -103,13 +75,14 @@ async function sendTelegramMessage(chatId, text, replyMarkup = null) {
     }
 }
 
-// بوت التليجرام (لوحة التحكم /admin)
+// بوت التليجرام (لوحة التحكم التفاعلية)
 app.post(`/telegram-webhook`, async (req, res) => {
     const update = req.body;
     res.sendStatus(200);
 
     if (!update) return;
 
+    // التعامل مع الرسائل النصية والخطوات التفاعلية
     if (update.message) {
         const msg = update.message;
         const chatId = msg.chat.id;
@@ -121,17 +94,50 @@ app.post(`/telegram-webhook`, async (req, res) => {
         }
 
         if (text === '/admin' || text === '/start') {
+            delete adminStates[chatId]; // إعادة ضبط أي حالة سابقة
             const keyboard = {
                 inline_keyboard: [
                     [{ text: "📊 إحصائيات الزيارات", callback_data: "stats" }],
                     [{ text: "⏱️ زيارات آخر 24 ساعة", callback_data: "stats_24h" }],
+                    [{ text: "➕ إضافة تقييم جديد", callback_data: "add_review_start" }],
                     [{ text: "⭐ إدارة وحذف التقييمات", callback_data: "manage_reviews" }]
                 ]
             };
             return sendTelegramMessage(chatId, "<b>مرحباً بك في لوحة أدمن منصة العاقل 👑</b>\nاختر من القائمة أدناه:", keyboard);
         }
+
+        // معالجة الخطوات التفاعلية لإضافة التقييم
+        if (adminStates[chatId]) {
+            const state = adminStates[chatId];
+            
+            if (state.step === 'WAITING_FOR_NAME') {
+                state.name = text;
+                state.step = 'WAITING_FOR_TEXT';
+                return sendTelegramMessage(chatId, `✍️ تمام (<b>${text}</b>).\nالآن أرسل <b>وصف التقييم</b> (رأي العميل):`);
+            } 
+            else if (state.step === 'WAITING_FOR_TEXT') {
+                state.text = text;
+                state.step = 'WAITING_FOR_RATING';
+                
+                const ratingKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: "⭐ 1", callback_data: "rate_1" },
+                            { text: "⭐⭐ 2", callback_data: "rate_2" },
+                            { text: "⭐⭐⭐ 3", callback_data: "rate_3" }
+                        ],
+                        [
+                            { text: "⭐⭐⭐⭐ 4", callback_data: "rate_4" },
+                            { text: "⭐⭐⭐⭐⭐ 5", callback_data: "rate_5" }
+                        ]
+                    ]
+                };
+                return sendTelegramMessage(chatId, "⭐ ممتاز، الآن اختر <b>عدد النجوم</b> من الأزرار بالأسفل:", ratingKeyboard);
+            }
+        }
     }
 
+    // التعامل مع الأزرار التفاعلية
     if (update.callback_query) {
         const query = update.callback_query;
         const chatId = query.message.chat.id;
@@ -161,12 +167,38 @@ app.post(`/telegram-webhook`, async (req, res) => {
             return sendTelegramMessage(chatId, `⏱️ <b>عدد الزوار خلال الـ 24 ساعة الماضية:</b>\n\n🔥 <code>${count24h}</code> زائر`);
         }
 
+        if (dataCmd === 'add_review_start') {
+            adminStates[chatId] = { step: 'WAITING_FOR_NAME' };
+            return sendTelegramMessage(chatId, "👤 <b>إضافة تقييم جديد</b>\n\nالرجاء إرسال <b>اسم العميل</b> في الرسالة التالية:");
+        }
+
+        if (dataCmd.startsWith('rate_')) {
+            const rating = parseInt(dataCmd.replace('rate_', ''));
+            const state = adminStates[chatId];
+            
+            if (state && state.step === 'WAITING_FOR_RATING') {
+                const newReview = {
+                    id: Date.now(),
+                    name: state.name,
+                    text: state.text,
+                    rating: rating,
+                    date: new Date().toISOString().split('T')[0]
+                };
+                
+                dbData.reviews.unshift(newReview);
+                saveData(dbData);
+                delete adminStates[chatId]; // مسح الحالة بعد الانتهاء
+
+                return sendTelegramMessage(chatId, `✅ <b>تم إضافة وحفظ التقييم بنجاح!</b>\n\n👤 <b>الاسم:</b> ${newReview.name}\n💬 <b>الوصف:</b> ${newReview.text}\n⭐ <b>التقييم:</b> ${'★'.repeat(rating)}\n\n<i>سيظهر في الموقع مباشرة الآن.</i>`);
+            }
+        }
+
         if (dataCmd === 'manage_reviews') {
             if (!dbData.reviews || dbData.reviews.length === 0) {
                 return sendTelegramMessage(chatId, "لا توجد تقييمات حالياً.");
             }
             let buttons = dbData.reviews.map(r => [{
-                text: `❌ حذف: (${r.text.substring(0, 15)}... - ${r.rating}⭐)`,
+                text: `❌ حذف: (${r.name} - ${r.rating}⭐)`,
                 callback_data: `del_rev_${r.id}`
             }]);
             return sendTelegramMessage(chatId, "<b>🗑️ اضغط على التقييم الذي تريد حذفه:</b>", { inline_keyboard: buttons });
