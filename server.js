@@ -6,7 +6,6 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ضع توكن بوتك هنا أو اتركه ليقرأه من المتغيرات البيئية
 const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_ID = 1056007305;
 
@@ -54,7 +53,24 @@ app.post('/api/visit', (req, res) => {
     res.json({ success: true });
 });
 
-// دالة إرسال رسائل تليجرام باستخدام https المدمجة
+// دالة إيقاف دائرة تحميل الأزرار في تليجرام
+function answerCallback(callbackQueryId) {
+    if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
+    const data = JSON.stringify({ callback_query_id: callbackQueryId });
+    const options = {
+        hostname: 'api.telegram.org',
+        port: 443,
+        path: `/bot${BOT_TOKEN}/answerCallbackQuery`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    };
+    const req = https.request(options, (res) => {});
+    req.on('error', (e) => {});
+    req.write(data);
+    req.end();
+}
+
+// دالة إرسال رسائل تليجرام
 function sendTelegramMessage(chatId, text, replyMarkup = null) {
     if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
     
@@ -76,15 +92,8 @@ function sendTelegramMessage(chatId, text, replyMarkup = null) {
         }
     };
 
-    const req = https.request(options, (res) => {
-        let responseBody = '';
-        res.on('data', (chunk) => { responseBody += chunk; });
-    });
-
-    req.on('error', (e) => {
-        console.error('Telegram send error:', e);
-    });
-
+    const req = https.request(options, (res) => {});
+    req.on('error', (e) => {});
     req.write(data);
     req.end();
 }
@@ -153,16 +162,20 @@ app.post(`/telegram-webhook`, async (req, res) => {
         const chatId = query.message.chat.id;
         const fromId = query.from.id;
         const dataCmd = query.data;
+        const queryId = query.id;
 
         if (fromId !== ADMIN_ID) return;
+
+        // إيقاف دائرة التحميل للزر فوراً
+        answerCallback(queryId);
 
         const dbData = loadData();
 
         if (dataCmd === 'stats') {
             let statsText = "<b>📊 إحصائيات الزيارات حسب الأيام:</b>\n\n";
-            const keys = Object.keys(dbData.visits).sort().reverse();
+            const keys = Object.keys(dbData.visits || {}).sort().reverse();
             if (keys.length === 0) {
-                statsText += "لا يوجد زيارات مسجلة بعد.";
+                statsText += "لا توجد زيارات مسجلة حتى الآن.";
             } else {
                 keys.slice(0, 10).forEach(date => {
                     statsText += `🗓️ <b>${date}:</b> ${dbData.visits[date]} زيارة\n`;
@@ -200,6 +213,8 @@ app.post(`/telegram-webhook`, async (req, res) => {
                 delete adminStates[chatId];
 
                 return sendTelegramMessage(chatId, `✅ <b>تم إضافة وحفظ التقييم بنجاح!</b>\n\n👤 <b>الاسم:</b> ${newReview.name}\n💬 <b>الوصف:</b> ${newReview.text}\n⭐ <b>التقييم:</b> ${'★'.repeat(rating)}\n\n<i>سيظهر في الموقع مباشرة الآن.</i>`);
+            } else {
+                return sendTelegramMessage(chatId, "⚠️ انتهت سياق الخطوات، الرجاء الضغط على زر (إضافة تقييم جديد) من البداية عبر /admin");
             }
         }
 
